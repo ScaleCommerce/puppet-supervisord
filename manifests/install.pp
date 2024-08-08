@@ -12,6 +12,14 @@ class supervisord::install inherits supervisord {
       unless      => 'which supervisorctl',
     }
   }
+  elsif $::supervisord::package_provider == 'pipx' {
+    exec { 'pipx-install-supervisor':
+      user        => root,
+      path        => ['/usr/bin','/bin', '/usr/local/bin'],
+      command     => "pipx install ${supervisord::package_name}",
+      unless      => 'which supervisorctl',
+    }
+  }
   else {
     package { $supervisord::package_name:
       ensure          => $supervisord::package_ensure,
