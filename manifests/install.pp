@@ -18,6 +18,7 @@ class supervisord::install inherits supervisord {
       path        => ['/usr/bin','/bin', '/usr/local/bin'],
       command     => "pipx install ${supervisord::package_name}",
       unless      => 'which supervisorctl',
+      require     => Package['pipx'],
     }
     file { '/usr/local/bin/supervisord':
       ensure => link,
