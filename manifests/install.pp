@@ -30,10 +30,15 @@ class supervisord::install inherits supervisord {
     }
   }
   else {
+    if $::supervisord::package_provider == 'pip' and file('/usr/local/bin/supervisord') {
+      notify { 'g package install': loglevel => 'debug' }
+    } 
+  else {
     package { $supervisord::package_name:
       ensure          => $supervisord::package_ensure,
       provider        => $supervisord::package_provider,
       install_options => $supervisord::package_install_options,
+      }
     }
   }
 }
