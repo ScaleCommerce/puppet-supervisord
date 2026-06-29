@@ -116,13 +116,14 @@ define supervisord::program(
     default => $cfgreload
   }
 
-  # Backend selection. When sc::service_manager is 'zpinit', emit a zpinit
+  # Backend selection. When the node's backend is 'zpinit', emit a zpinit
   # service TOML instead of supervisord config / supervisorctl resources. The
   # Supervisord::Program[$title] resource still exists (this define), so existing
   # `before/require/notify => Supervisord::Program[X]` references keep resolving
   # on both backends -- no data rewrite needed. This is a transitional shim while
-  # the fleet migrates off supervisord.
-  $_service_manager = lookup('sc::service_manager', Enum['supervisor', 'zpinit'], 'first', 'supervisor')
+  # the fleet migrates off supervisord. The backend is auto-detected (see
+  # supervisord/init.pp $service_manager) and overridable via sc::service_manager.
+  $_service_manager = $supervisord::service_manager
 
   if $_service_manager == 'zpinit' {
     # zpinit::service accepts supervisord parameter names; drop undef so strict

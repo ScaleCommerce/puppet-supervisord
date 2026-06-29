@@ -2,14 +2,13 @@
 #
 # Installs supervisor package (defaults to using pip)
 #
-# When sc::service_manager is 'zpinit' this is a no-op: the supervisord daemon
+# When the node's backend is 'zpinit' this is a no-op: the supervisord daemon
 # is not installed (zpinit is PID 1). The class is still declared so the
-# anchor chain in init.pp resolves.
+# anchor chain in init.pp resolves. Backend is auto-detected (see init.pp
+# $service_manager) and overridable via sc::service_manager.
 #
 class supervisord::install inherits supervisord {
-  $_service_manager = lookup('sc::service_manager', Enum['supervisor', 'zpinit'], 'first', 'supervisor')
-
-  unless $_service_manager == 'zpinit' {
+  unless $supervisord::service_manager == 'zpinit' {
     # Check if supervisord is already installed in the system (not in venv)
     # This prevents reinstallation via pip in new venv when old system Python installation exists
     exec { 'check-supervisord-installed':

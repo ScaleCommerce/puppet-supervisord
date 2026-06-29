@@ -181,6 +181,18 @@ class supervisord(
     $config_include_string = "${config_include}/*.conf"
   }
 
+  # Backend detection, computed once and consumed by program.pp / install.pp /
+  # service.pp via $supervisord::service_manager. sc::service_manager is an
+  # OPTIONAL explicit override; when it is unset the value falls back to the
+  # $service_manager fact the node reports ('zpinit' when zpinit is the node's
+  # PID-1 supervisor, else 'supervisor'). 'supervisor' is the final fallback if
+  # the fact is somehow absent (e.g. pluginsync hasn't delivered it yet).
+  $_detected_service_manager = $facts['service_manager'] ? {
+    'zpinit' => 'zpinit',
+    default  => 'supervisor',
+  }
+  $service_manager = lookup('sc::service_manager', Enum['supervisor', 'zpinit'], 'first', $_detected_service_manager)
+
   create_resources('supervisord::eventlistener', $eventlisteners)
   create_resources('supervisord::fcgi_program', $fcgi_programs)
   create_resources('supervisord::group', $groups)
