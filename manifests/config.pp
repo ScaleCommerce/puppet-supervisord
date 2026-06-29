@@ -2,7 +2,16 @@
 #
 # Configuration class for supervisor init and conf directories
 #
+# When the node's backend is 'zpinit' this is a no-op: there is no supervisord
+# daemon, so its config dirs, supervisord.conf and init script are not managed
+# (and reload is not notified -- which is what was driving supervisorctl on
+# zpinit nodes). The class is still declared so the anchor chain in init.pp
+# resolves. Backend is auto-detected (see init.pp $service_manager) and
+# overridable via sc::service_manager.
+#
 class supervisord::config inherits supervisord {
+
+  unless $supervisord::service_manager == 'zpinit' {
 
   if ($supervisord::manage_config) {
     file { $supervisord::config_include:
@@ -89,5 +98,7 @@ class supervisord::config inherits supervisord {
       content => template('supervisord/supervisord_main.erb'),
       order   => '03'
     }
+  }
+
   }
 }
