@@ -116,48 +116,82 @@ define supervisord::program(
     default => $cfgreload
   }
 
-  $conf = "${supervisord::config_include}/program_${name}.conf"
+  # Backend selection. When sc::service_manager is 'zpinit', emit a zpinit
+  # service TOML instead of supervisord config / supervisorctl resources. The
+  # Supervisord::Program[$title] resource still exists (this define), so existing
+  # `before/require/notify => Supervisord::Program[X]` references keep resolving
+  # on both backends -- no data rewrite needed. This is a transitional shim while
+  # the fleet migrates off supervisord.
+  $_service_manager = lookup('sc::service_manager', Enum['supervisor', 'zpinit'], 'first', 'supervisor')
 
-  file { $conf:
-    ensure  => $ensure,
-    owner   => 'root',
-    mode    => $config_file_mode,
-    content => template('supervisord/conf/program.erb'),
-  }
+  if $_service_manager == 'zpinit' {
+    # zpinit::service accepts supervisord parameter names; drop undef so strict
+    # zpinit::service params (e.g. priority Integer[0,9999] default 50) fall back
+    # to their defaults. stdout/stderr logfile + redirect_stderr are
+    # intentionally NOT passed: their supervisord defaults are relative filenames
+    # that would become a bogus zpinit [log] path, and zpinit should inherit the
+    # container's stdout/stderr by default.
+    $_zpinit_params = {
+      'command'             => $command,
+      'ensure'              => $ensure,
+      'autostart'           => $autostart,
+      'autorestart'         => $autorestart,
+      'user'                => $user,
+      'numprocs'            => $numprocs,
+      'stopsignal'          => $stopsignal,
+      'stopwaitsecs'        => $stopwaitsecs,
+      'directory'           => $directory,
+      'environment'         => $environment,
+      'program_environment' => $program_environment,
+      'env_var'             => $env_var,
+      'priority'            => $priority,
+      'ensure_process'      => $ensure_process,
+    }.filter |$k, $v| { $v =~ NotUndef }
+    zpinit::service { $name: * => $_zpinit_params }
+  } else {
+    $conf = "${supervisord::config_include}/program_${name}.conf"
 
-  if $_cfgreload {
-    File[$conf] {
-      notify => Class['supervisord::reload'],
+    file { $conf:
+      ensure  => $ensure,
+      owner   => 'root',
+      mode    => $config_file_mode,
+      content => template('supervisord/conf/program.erb'),
     }
-  }
 
-  if ($numprocs != 1 ) {
-    $pname = "${name}:*"
-  }
-  else {
-    $pname = $name
-  }
-
-  case $ensure_process {
-    'stopped': {
-      supervisord::supervisorctl { "stop_${name}":
-        command => 'stop',
-        process => $pname
+    if $_cfgreload {
+      File[$conf] {
+        notify => Class['supervisord::reload'],
       }
     }
-    'removed': {
-      supervisord::supervisorctl { "remove_${name}":
-        command => 'remove',
-        process => $pname
-      }
+
+    if ($numprocs != 1 ) {
+      $pname = "${name}:*"
     }
-    'running': {
-      supervisord::supervisorctl { "start_${name}":
-        command => 'start',
-        process => $pname,
-        unless  => 'running'
-      }
+    else {
+      $pname = $name
     }
-    default: { }
+
+    case $ensure_process {
+      'stopped': {
+        supervisord::supervisorctl { "stop_${name}":
+          command => 'stop',
+          process => $pname
+        }
+      }
+      'removed': {
+        supervisord::supervisorctl { "remove_${name}":
+          command => 'remove',
+          process => $pname
+        }
+      }
+      'running': {
+        supervisord::supervisorctl { "start_${name}":
+          command => 'start',
+          process => $pname,
+          unless  => 'running'
+        }
+      }
+      default: { }
+    }
   }
 }

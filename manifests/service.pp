@@ -2,8 +2,14 @@
 #
 # Class for the supervisord service
 #
+# When sc::service_manager is 'zpinit' this is a no-op: the supervisord daemon
+# service is not managed (zpinit supervises processes instead). The class is
+# still declared so the anchor chain in init.pp resolves.
+#
 class supervisord::service inherits supervisord  {
-  if $::supervisord::service_manage {
+  $_service_manager = lookup('sc::service_manager', Enum['supervisor', 'zpinit'], 'first', 'supervisor')
+
+  if $::supervisord::service_manage and $_service_manager != 'zpinit' {
     if $::supervisord::init_type == 'systemd' {
       exec { 'refresh_supervisord_unit':
         command     => '/usr/bin/env systemctl daemon-reload',
