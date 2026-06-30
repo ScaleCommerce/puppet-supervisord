@@ -148,16 +148,11 @@ define supervisord::program(
       'priority'            => $priority,
       'ensure_process'      => $ensure_process,
     }.filter |$k, $v| { $v =~ NotUndef }
+    # zpinit::service writes the TOML and (when it declares no Service of its
+    # own) notifies zpinit::reload to run `zpctl update`, so a new/changed
+    # program is loaded into the running set without a backend-specific step
+    # here. Loading is owned by the zpinit module, not this dispatch shim.
     zpinit::service { $name: * => $_zpinit_params }
-
-    # Load the new/changed TOML into the running set. Mirrors the supervisord
-    # branch's notify to supervisord::reload (which on zpinit runs `zpctl
-    # update`). Required so a program with no separate Service[name] still gets
-    # started during the run instead of waiting for the next zpinit restart.
-    # Refresh propagates from the TOML file inside zpinit::service.
-    if $_cfgreload {
-      Zpinit::Service[$name] ~> Class['supervisord::reload']
-    }
   } else {
     $conf = "${supervisord::config_include}/program_${name}.conf"
 

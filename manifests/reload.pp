@@ -1,28 +1,17 @@
 # Class: supervisord::reload
 #
-# Loads added/changed program definitions into the running supervisor. Backend
-# is auto-detected (see init.pp $service_manager) and overridable via
+# Class to reread and update supervisord with supervisorctl
+#
+# When the node's backend is 'zpinit' this is a no-op: there is no supervisord
+# daemon and no supervisorctl to call, and loading TOMLs into the running set is
+# owned by the zpinit module (zpinit::service notifies zpinit::reload, which
+# runs `zpctl update`). The class is still declared (and is a harmless refresh
+# target for config.pp) so existing notify/anchor references resolve. Backend is
+# auto-detected (see init.pp $service_manager) and overridable via
 # sc::service_manager.
 #
-# On supervisord this runs `supervisorctl reread && update`. On zpinit it runs
-# the equivalent `zpctl update` (global config reload: starts added services,
-# stops removed, restarts changed -- see zpinit cmdUpdate). This matters because
-# zpinit does NOT pick up newly written service TOMLs on its own during a Puppet
-# run, so a program declared via supervisord::program that has no separate
-# Service[name] (e.g. cron, gitlab-runner, rundeck-node-consul-*) would
-# otherwise sit on disk unloaded until the next zpinit restart. program.pp
-# notifies this class when a program's config (conf or TOML) changes, on both
-# backends. Refreshonly + idempotent, so it is safe alongside the per-service
-# reload the zpinit Service provider already does for managed services.
-#
 class supervisord::reload inherits supervisord {
-  if $supervisord::service_manager == 'zpinit' {
-    exec { 'zpctl_update':
-      command     => 'zpctl update',
-      path        => ['/usr/local/sbin', '/usr/local/bin', '/usr/sbin', '/usr/bin', '/sbin', '/bin'],
-      refreshonly => true,
-    }
-  } else {
+  unless $supervisord::service_manager == 'zpinit' {
     $supervisorctl = $::supervisord::executable_ctl
 
     exec { 'supervisorctl_reread':
