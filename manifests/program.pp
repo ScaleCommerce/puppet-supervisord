@@ -165,7 +165,12 @@ define supervisord::program(
       }
     }
 
-    if ($numprocs != 1 ) {
+    # supervisorctl target. A program is a homogeneous process group (members
+    # named "<name>:<process_name>") whenever numprocs > 1 OR process_name
+    # contains %(process_num) -- the latter can happen at numprocs == 1 via an
+    # explicit process_name, in which case the bare name is not addressable and
+    # supervisorctl reports "no such process". Use the ":*" group form for both.
+    if $numprocs != 1 or ($process_name and $process_name =~ /%\(process_num\)/) {
       $pname = "${name}:*"
     }
     else {
