@@ -2,13 +2,21 @@
 #
 # Installs supervisor package (defaults to using pip)
 #
-# When the node's backend is 'zpinit' this is a no-op: the supervisord daemon
-# is not installed (zpinit is PID 1). The class is still declared so the
+# On a zpinit node the supervisord daemon is not installed (zpinit is PID 1).
+# Instead we drop a supervisorctl -> zpctl compatibility symlink so any legacy
+# caller still invoking `supervisorctl` (scripts, third-party tooling, cron
+# jobs) transparently drives zpinit; zpctl implements the same verbs
+# (status/start/stop/restart/update). The class is always declared so the
 # anchor chain in init.pp resolves. Backend is auto-detected (see init.pp
 # $service_manager) and overridable via sc::service_manager.
 #
 class supervisord::install inherits supervisord {
-  unless $supervisord::service_manager == 'zpinit' {
+  if $supervisord::service_manager == 'zpinit' {
+    file { '/usr/local/bin/supervisorctl':
+      ensure => link,
+      target => '/usr/local/bin/zpctl',
+    }
+  } else {
     # Check if supervisord is already installed in the system (not in venv)
     # This prevents reinstallation via pip in new venv when old system Python installation exists
     exec { 'check-supervisord-installed':
